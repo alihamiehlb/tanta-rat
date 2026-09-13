@@ -1,519 +1,700 @@
-const API_BASE = '/api';
+'use strict';
 
+// ──────────────────────────────────────────────
 // State
+// ──────────────────────────────────────────────
 const state = {
-    authToken: localStorage.getItem('guardianToken') || '',
-    socket: null,
-    selectedDeviceId: null,
-    devices: new Map(),
-    map: null,
-    locationMarker: null,
-    locationTrail: null,
-    trailLatLngs: [],
-    isDrawing: false,
-    swipeStart: null,
-    frameCount: 0,
-    lastFpsUpdate: Date.now(),
-    blockedApps: [],
-    blockedSites: [],
-    installedApps: [],
-    blockLog: { apps: [], sites: [] },
-    deviceWidth: 1080,
-    deviceHeight: 1920
+    token:          localStorage.getItem('gs_token') || '',
+    socket:         null,
+    deviceId:       null,       // currently selected device
+    devices:        new Map(),  // deviceId -> device object
+    // Map
+    map:            null,
+    mapMarker:      null,
+    mapTrail:       null,
+    trailPoints:    [],
+    // Data
+    blockedApps:    [],
+    blockedSites:   [],
+    installedApps:  [],
+    blockLogApps:   [],
+    blockLogSites:  [],
+    // Stream
+    frameCount:     0,
+    lastFrameTime:  Date.now(),
+    deviceW:        1080,
+    deviceH:        1920,
+    // Gesture tracking
+    dragging:       false,
+    dragStart:      null,
 };
 
-// DOM Elements
-const els = {
-    loginScreen: document.getElementById('login-screen'),
-    mainDashboard: document.getElementById('main-dashboard'),
-    loginForm: document.getElementById('login-form'),
-    authTokenInput: document.getElementById('auth-token'),
-    deviceList: document.getElementById('device-list'),
-    tabBtns: document.querySelectorAll('.tab-btn'),
-    tabContents: document.querySelectorAll('.tab-content'),
-    mirrorStatus: document.getElementById('mirror-status'),
-    fpsCounter: document.getElementById('fps-counter'),
-    canvas: document.getElementById('screen-canvas'),
-    ctx: null,
-    qualitySelector: document.getElementById('quality-selector')
-};
+// ──────────────────────────────────────────────
+// DOM references (queried once after DOMContentLoaded)
+// ──────────────────────────────────────────────
+let $;
 
-els.ctx = els.canvas.getContext('2d', { alpha: false });
+function initDom() {
+    $ = {
+        loginScreen:    document.getElementById('login-screen'),
+        dashboard:      document.getElementById('main-dashboard'),
+        loginForm:      document.getElementById('login-form'),
+        tokenInput:     document.getElementById('auth-token'),
+        btnLogout:      document.getElementById('btn-logout'),
+        deviceList:     document.getElementById('device-list'),
+        tabBtns:        document.querySelectorAll('.tab-btn'),
+        tabContents:    document.querySelectorAll('.tab-content'),
+        connStatus:     document.getElementById('connection-status'),
+        fpsCounter:     document.getElementById('fps-counter'),
+        latency:        document.getElementById('latency-indicator'),
+        canvas:         document.getElementById('screen-canvas'),
+        canvasPlaceholder: document.getElementById('canvas-placeholder'),
+        // Location
+        infoLatlng:     document.getElementById('info-latlng'),
+        infoAccuracy:   document.getElementById('info-accuracy'),
+        infoSpeed:      document.getElementById('info-speed'),
+        infoLastUpdate: document.getElementById('info-last-update'),
+        btnReqLocation: document.getElementById('btn-request-location'),
+        // App blocker
+        appSearch:      document.getElementById('app-search'),
+        btnRefreshApps: document.getElementById('btn-refresh-apps'),
+        installedList:  document.getElementById('installed-apps-list'),
+        blockedAppsList:document.getElementById('blocked-apps-list'),
+        appBlockLog:    document.getElementById('app-block-log'),
+        // Site blocker
+        domainInput:    document.getElementById('domain-input'),
+        btnAddDomain:   document.getElementById('btn-add-domain'),
+        blockedSitesList:document.getElementById('blocked-sites-list'),
+        siteBlockLog:   document.getElementById('site-block-log'),
+        presetBtns:     document.querySelectorAll('.preset-btn'),
+        // Actions
+        btnPlaySound:   document.getElementById('action-play-sound'),
+        btnReqLoc2:     document.getElementById('action-request-location'),
+        btnLockScreen:  document.getElementById('action-lock-screen'),
+        // Quality
+        qualityBtns:    document.querySelectorAll('.quality-btn'),
+        // Nav
+        navBack:        document.getElementById('nav-back'),
+        navHome:        document.getElementById('nav-home'),
+        navRecents:     document.getElementById('nav-recents'),
+    };
 
-// Initialize
-function init() {
-    if (state.authToken) {
-        connectSocket(state.authToken);
-    }
-
-    els.loginForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const token = els.authTokenInput.value.trim();
-        if (token) {
-            localStorage.setItem('guardianToken', token);
-            state.authToken = token;
-            connectSocket(token);
-        }
-    });
-
-    // Tabs
-    els.tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const tabId = btn.dataset.tab;
-            els.tabBtns.forEach(b => b.classList.remove('active'));
-            els.tabContents.forEach(c => c.classList.remove('active'));
-            
-            btn.classList.add('active');
-            document.getElementById(`tab-${tabId}`).classList.add('active');
-
-            if (tabId === 'location') initMap();
-        });
-    });
-
-    setupCanvasInteractions();
-    setupNavigationButtons();
-    setupBlockers();
-    setupActions();
-
-    // FPS Loop
-    setInterval(() => {
-        els.fpsCounter.innerText = `${state.frameCount} FPS`;
-        state.frameCount = 0;
-    }, 1000);
+    $.ctx = $.canvas.getContext('2d', { alpha: false });
 }
 
-function connectSocket(token) {
+// ──────────────────────────────────────────────
+// Init
+// ──────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    initDom();
+    setupTabs();
+    setupCanvas();
+    setupNavButtons();
+    setupBlockerUI();
+    setupActions();
+    setupQualityBtns();
+
+    // Auto-login if token saved
+    if (state.token) {
+        $.tokenInput.value = state.token;
+        connect(state.token);
+    }
+
+    $.loginForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const token = $.tokenInput.value.trim();
+        if (!token) return;
+        connect(token);
+    });
+
+    $.btnLogout.addEventListener('click', disconnect);
+
+    // FPS counter
+    setInterval(() => {
+        $.fpsCounter.textContent = `${state.frameCount} FPS`;
+        state.frameCount = 0;
+    }, 1000);
+});
+
+// ──────────────────────────────────────────────
+// Socket connection
+// ──────────────────────────────────────────────
+function connect(token) {
+    if (state.socket) state.socket.disconnect();
+
+    state.token = token;
+    localStorage.setItem('gs_token', token);
+
     state.socket = io('/dashboard', {
-        auth: { token },
-        query: { token }
+        auth:  { token },
+        query: { token },
+        transports: ['websocket'],
     });
 
     state.socket.on('connect', () => {
-        console.log('Connected to server');
-        els.loginScreen.classList.add('hidden');
-        els.mainDashboard.classList.remove('hidden');
+        showDashboard();
+        console.log('Connected to GuardianShield server');
     });
 
     state.socket.on('connect_error', (err) => {
-        console.error('Connection error:', err.message);
-        localStorage.removeItem('guardianToken');
-        state.authToken = '';
-        els.loginScreen.classList.remove('hidden');
-        els.mainDashboard.classList.add('hidden');
-        if (state.socket) { state.socket.disconnect(); state.socket = null; }
-        alert('Connection error: Invalid token or server unreachable.');
+        console.error('Auth error:', err.message);
+        localStorage.removeItem('gs_token');
+        state.token = '';
+        showLogin();
+        alert('Connection failed — check your AUTH_TOKEN.');
     });
 
-    state.socket.on('devices_list', (devices) => {
+    state.socket.on('disconnect', () => {
+        updateConnectionStatus(false);
+    });
+
+    // Device list
+    state.socket.on('devices_list', (list) => {
         state.devices.clear();
-        devices.forEach(d => state.devices.set(d.deviceId, d));
+        list.forEach(d => state.devices.set(d.deviceId, d));
         renderDeviceList();
     });
 
-    state.socket.on('device_connected', (device) => {
-        state.devices.set(device.deviceId, device);
+    state.socket.on('device_connected', (d) => {
+        state.devices.set(d.deviceId, d);
         renderDeviceList();
     });
 
     state.socket.on('device_disconnected', (data) => {
-        const deviceId = data.deviceId || data;
-        const device = state.devices.get(deviceId);
-        if (device) {
-            device.online = false;
-            renderDeviceList();
-        }
+        const id = typeof data === 'string' ? data : data.deviceId;
+        const d = state.devices.get(id);
+        if (d) { d.online = false; renderDeviceList(); }
+        if (id === state.deviceId) updateConnectionStatus(false);
     });
 
+    // Screen frame
     state.socket.on('frame', async (data) => {
-        if (!state.selectedDeviceId) return;
-        
+        if (!state.deviceId) return;
         try {
-            // data may arrive as {deviceId, buffer, ...} or raw binary
-            const frameBuffer = data.buffer || data;
-            const blob = new Blob([frameBuffer], { type: 'image/webp' });
-            const imageBitmap = await createImageBitmap(blob);
-            
-            els.canvas.width = imageBitmap.width;
-            els.canvas.height = imageBitmap.height;
-            state.deviceWidth = imageBitmap.width;
-            state.deviceHeight = imageBitmap.height;
+            const buf = data.buffer || data;
+            const blob = new Blob([buf], { type: 'image/webp' });
+            const bmp = await createImageBitmap(blob);
 
-            els.ctx.drawImage(imageBitmap, 0, 0);
-            imageBitmap.close();
+            $.canvas.width  = bmp.width;
+            $.canvas.height = bmp.height;
+            state.deviceW   = bmp.width;
+            state.deviceH   = bmp.height;
+
+            $.ctx.drawImage(bmp, 0, 0);
+            bmp.close();
             state.frameCount++;
-            
+            $.canvasPlaceholder.style.display = 'none';
+
             if (data.timestamp) {
-                const latency = Date.now() - data.timestamp;
-                const el = document.getElementById('latency-indicator');
-                if (el) el.innerText = `${latency}ms`;
+                $.latency.textContent = `${Date.now() - data.timestamp}ms`;
             }
         } catch (e) {
-            console.error('Frame decode error:', e);
+            console.warn('Frame decode error', e);
         }
     });
 
+    // Location
     state.socket.on('location_update', (data) => {
-        if (data.deviceId !== state.selectedDeviceId) return;
-        updateLocation(data.location || data);
+        if (data.deviceId !== state.deviceId) return;
+        updateMap(data.location || data);
     });
 
-    state.socket.on('installed_apps', (data) => {
-        if (data.deviceId !== state.selectedDeviceId) return;
-        state.installedApps = data.apps;
+    // Installed apps
+    state.socket.on('installed_apps_update', (data) => {
+        if (data.deviceId !== state.deviceId) return;
+        state.installedApps = data.apps || [];
         renderInstalledApps();
     });
-    
+
+    // Block events
     state.socket.on('block_event', (data) => {
-        if (data.deviceId !== state.selectedDeviceId) return;
+        if (data.deviceId !== state.deviceId) return;
         if (data.type === 'app') {
-            state.blockLog.apps.unshift(data);
-            if (state.blockLog.apps.length > 50) state.blockLog.apps.pop();
+            state.blockLogApps.unshift(data);
+            if (state.blockLogApps.length > 50) state.blockLogApps.pop();
             renderAppBlockLog();
-        } else if (data.type === 'site') {
-            state.blockLog.sites.unshift(data);
-            if (state.blockLog.sites.length > 50) state.blockLog.sites.pop();
+        } else {
+            state.blockLogSites.unshift(data);
+            if (state.blockLogSites.length > 50) state.blockLogSites.pop();
             renderSiteBlockLog();
         }
     });
 }
 
+function disconnect() {
+    if (state.socket) { state.socket.disconnect(); state.socket = null; }
+    localStorage.removeItem('gs_token');
+    state.token = '';
+    state.deviceId = null;
+    state.devices.clear();
+    showLogin();
+}
+
+// ──────────────────────────────────────────────
+// Screen show/hide
+// ──────────────────────────────────────────────
+function showDashboard() {
+    $.loginScreen.classList.add('hidden');
+    $.dashboard.classList.remove('hidden');
+}
+function showLogin() {
+    $.loginScreen.classList.remove('hidden');
+    $.dashboard.classList.add('hidden');
+}
+
+// ──────────────────────────────────────────────
+// Device management
+// ──────────────────────────────────────────────
 function renderDeviceList() {
-    els.deviceList.innerHTML = '';
+    $.deviceList.innerHTML = '';
+
     if (state.devices.size === 0) {
-        els.deviceList.innerHTML = '<li class="no-devices">No devices connected</li>';
+        $.deviceList.innerHTML = `
+            <li class="no-devices">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20">
+                    <rect x="5" y="2" width="14" height="20" rx="2"/>
+                    <line x1="12" y1="18" x2="12" y2="18.01" stroke-width="2"/>
+                </svg>
+                No devices connected
+            </li>`;
         return;
     }
 
     state.devices.forEach((device, id) => {
         const li = document.createElement('li');
-        if (id === state.selectedDeviceId) li.classList.add('selected');
-        
-        const lastSeen = device.lastSeen ? new Date(device.lastSeen).toLocaleString() : 'N/A';
-        const displayName = device.label || device.model || 'Unknown Device';
-        const shortId = id.length > 8 ? id.substring(0, 8) : id;
-        
+        li.dataset.id = id;
+        if (id === state.deviceId) li.classList.add('selected');
+
+        const name    = device.label || device.model || 'Unknown Device';
+        const shortId = id.substring(0, 8);
+        const lastSeen = device.lastSeen
+            ? new Date(device.lastSeen).toLocaleTimeString()
+            : 'Never';
+
         li.innerHTML = `
             <div class="status-dot ${device.online ? 'online' : ''}"></div>
             <div class="device-info">
-                <span class="device-name">${displayName}</span>
-                <span class="device-last-seen">ID: ${shortId} • ${lastSeen}</span>
-            </div>
-        `;
-        
+                <span class="device-name">${escHtml(name)}</span>
+                <span class="device-last-seen">${shortId} · ${lastSeen}</span>
+            </div>`;
+
         li.addEventListener('click', () => selectDevice(id));
-        els.deviceList.appendChild(li);
+        $.deviceList.appendChild(li);
     });
 }
 
-function selectDevice(deviceId) {
-    state.selectedDeviceId = deviceId;
+function selectDevice(id) {
+    state.deviceId = id;
     renderDeviceList();
-    els.mirrorStatus.innerText = `Connected - Streaming`;
-    
-    state.socket.emit('watch_device', deviceId);
-    
-    els.ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
-    state.trailLatLngs = [];
-    if (state.locationTrail) state.locationTrail.setLatLngs([]);
-    
-    fetchDeviceData(deviceId);
+
+    const device = state.devices.get(id);
+    updateConnectionStatus(device?.online ?? false, device?.label || device?.model || id);
+
+    // Subscribe to this device's screen
+    if (state.socket) state.socket.emit('watch_device', id);
+
+    // Clear old frame
+    $.ctx.clearRect(0, 0, $.canvas.width, $.canvas.height);
+    $.canvasPlaceholder.style.display = 'flex';
+
+    // Reset location trail
+    state.trailPoints = [];
+    if (state.mapTrail) state.mapTrail.setLatLngs([]);
+
+    // Fetch blocklists and installed apps
+    fetchBlocklists(id);
 }
 
-async function fetchDeviceData(deviceId) {
-    try {
-        // Fetch blocklists
-        const res = await fetch(`${API_BASE}/blocklist/${deviceId}`, {
-            headers: { 'Authorization': `Bearer ${state.authToken}` }
-        });
-        if (res.ok) {
-            const data = await res.json();
-            state.blockedApps = data.apps || [];
-            state.blockedSites = data.sites || [];
-            renderBlockedApps();
-            renderBlockedSites();
-        }
-
-        // Request installed apps from device via socket
-        state.socket.emit('request_installed_apps', deviceId);
-    } catch (e) {
-        console.error('Error fetching device data:', e);
+function updateConnectionStatus(online, label = '') {
+    if (online) {
+        $.connStatus.className = 'status-badge online';
+        $.connStatus.innerHTML = `<span class="status-dot online"></span>${escHtml(label)}`;
+    } else {
+        $.connStatus.className = 'status-badge offline';
+        $.connStatus.innerHTML = `<span class="status-dot"></span>No Device`;
     }
 }
 
-// Canvas Interaction
-function setupCanvasInteractions() {
-    els.canvas.addEventListener('contextmenu', e => e.preventDefault());
+// ──────────────────────────────────────────────
+// API helpers
+// ──────────────────────────────────────────────
+async function apiFetch(path, method = 'GET', body = null) {
+    const opts = {
+        method,
+        headers: {
+            'Authorization': `Bearer ${state.token}`,
+            ...(body ? { 'Content-Type': 'application/json' } : {}),
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+    };
+    const res = await fetch(`/api${path}`, opts);
+    if (!res.ok) throw new Error(`${method} ${path} → ${res.status}`);
+    return res.json();
+}
 
-    function getDeviceCoords(e) {
-        const rect = els.canvas.getBoundingClientRect();
-        const scaleX = state.deviceWidth / rect.width;
-        const scaleY = state.deviceHeight / rect.height;
+async function fetchBlocklists(id) {
+    try {
+        const data = await apiFetch(`/blocklist/${id}`);
+        state.blockedApps  = data.apps  || [];
+        state.blockedSites = data.sites || [];
+        renderBlockedApps();
+        renderBlockedSites();
+        renderInstalledApps();
+    } catch (e) {
+        console.warn('Blocklist fetch error', e);
+    }
+
+    // Ask device for installed apps
+    if (state.socket) state.socket.emit('request_installed_apps', id);
+}
+
+async function saveBlocklists() {
+    if (!state.deviceId) return;
+    try {
+        await apiFetch(`/blocklist/${state.deviceId}`, 'PUT', {
+            apps:  state.blockedApps,
+            sites: state.blockedSites,
+        });
+    } catch (e) {
+        console.warn('Blocklist save error', e);
+    }
+}
+
+async function sendCommand(action, params = {}) {
+    if (!state.deviceId) { alert('Select a device first.'); return; }
+    try {
+        await apiFetch(`/command/${state.deviceId}`, 'POST', { action, params });
+    } catch (e) {
+        console.warn('Command error', e);
+    }
+}
+
+// ──────────────────────────────────────────────
+// Tabs
+// ──────────────────────────────────────────────
+function setupTabs() {
+    $.tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            $.tabBtns.forEach(b => b.classList.remove('active'));
+            $.tabContents.forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            const tab = document.getElementById(`tab-${btn.dataset.tab}`);
+            if (tab) tab.classList.add('active');
+            if (btn.dataset.tab === 'location') initMap();
+        });
+    });
+}
+
+// ──────────────────────────────────────────────
+// Canvas / Remote control
+// ──────────────────────────────────────────────
+function setupCanvas() {
+    const cv = $.canvas;
+
+    cv.addEventListener('contextmenu', e => e.preventDefault());
+    cv.setAttribute('tabindex', '0');
+
+    function getCoords(e) {
+        const r = cv.getBoundingClientRect();
         return {
-            x: (e.clientX - rect.left) * scaleX,
-            y: (e.clientY - rect.top) * scaleY
+            x: Math.round((e.clientX - r.left) * (state.deviceW / r.width)),
+            y: Math.round((e.clientY - r.top)  * (state.deviceH / r.height)),
         };
     }
 
-    els.canvas.addEventListener('mousedown', (e) => {
-        if (!state.selectedDeviceId) return;
-        const coords = getDeviceCoords(e);
-        state.isDrawing = true;
-        state.swipeStart = { x: coords.x, y: coords.y, time: Date.now() };
+    cv.addEventListener('mousedown', (e) => {
+        if (!state.deviceId) return;
+        e.preventDefault();
+        cv.focus();
+        state.dragging  = true;
+        state.dragStart = { ...getCoords(e), t: Date.now() };
     });
 
-    els.canvas.addEventListener('mouseup', (e) => {
-        if (!state.isDrawing || !state.selectedDeviceId) return;
-        state.isDrawing = false;
-        const coords = getDeviceCoords(e);
-        const start = state.swipeStart;
-        const duration = Date.now() - start.time;
-        
-        const dist = Math.hypot(coords.x - start.x, coords.y - start.y);
-        
-        if (dist < 10) {
-            // Tap
-            state.socket.emit('touch', {
-                deviceId: state.selectedDeviceId,
-                action: 'tap',
-                x: start.x,
-                y: start.y
-            });
+    cv.addEventListener('mouseup', (e) => {
+        if (!state.dragging || !state.deviceId) return;
+        state.dragging = false;
+        const end  = getCoords(e);
+        const dx   = end.x - state.dragStart.x;
+        const dy   = end.y - state.dragStart.y;
+        const dist = Math.hypot(dx, dy);
+        const dur  = Date.now() - state.dragStart.t;
+
+        if (dist < 8) {
+            emit('touch', { action: 'tap', x: state.dragStart.x, y: state.dragStart.y });
         } else {
-            // Swipe
-            state.socket.emit('touch', {
-                deviceId: state.selectedDeviceId,
-                action: 'swipe',
-                x1: start.x,
-                y1: start.y,
-                x2: coords.x,
-                y2: coords.y,
-                duration: duration
-            });
+            emit('touch', { action: 'swipe', x1: state.dragStart.x, y1: state.dragStart.y, x2: end.x, y2: end.y, duration: dur });
         }
     });
 
-    els.canvas.addEventListener('mouseleave', () => { state.isDrawing = false; });
+    cv.addEventListener('mouseleave', () => { state.dragging = false; });
 
-    els.canvas.addEventListener('keydown', (e) => {
-        if (!state.selectedDeviceId) return;
+    cv.addEventListener('keydown', (e) => {
+        if (!state.deviceId) return;
         e.preventDefault();
-        state.socket.emit('touch', {
-            deviceId: state.selectedDeviceId,
-            action: 'type',
-            text: e.key
-        });
+        if (e.key === 'Backspace') {
+            emit('touch', { action: 'key', keyCode: 67 }); // KEYCODE_DEL
+        } else if (e.key === 'Enter') {
+            emit('touch', { action: 'key', keyCode: 66 }); // KEYCODE_ENTER
+        } else if (e.key.length === 1) {
+            emit('touch', { action: 'type', text: e.key });
+        }
     });
+
+    // Touch support (mobile dashboard)
+    let touchStart = null;
+    cv.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const t = e.touches[0];
+        const coords = getCoords(t);
+        touchStart = { ...coords, t: Date.now() };
+    }, { passive: false });
+
+    cv.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        if (!touchStart || !state.deviceId) return;
+        const t = e.changedTouches[0];
+        const end  = getCoords(t);
+        const dist = Math.hypot(end.x - touchStart.x, end.y - touchStart.y);
+        if (dist < 8) {
+            emit('touch', { action: 'tap', x: touchStart.x, y: touchStart.y });
+        } else {
+            emit('touch', { action: 'swipe', x1: touchStart.x, y1: touchStart.y, x2: end.x, y2: end.y, duration: Date.now() - touchStart.t });
+        }
+        touchStart = null;
+    }, { passive: false });
 }
 
-function setupNavigationButtons() {
-    const navs = ['back', 'home', 'recents'];
-    navs.forEach(nav => {
-        document.getElementById(`nav-${nav}`).addEventListener('click', () => {
-            if (state.selectedDeviceId) {
-                state.socket.emit('touch', { deviceId: state.selectedDeviceId, action: nav });
-            }
-        });
-    });
+function emit(event, data) {
+    if (!state.socket || !state.deviceId) return;
+    state.socket.emit(event, { deviceId: state.deviceId, ...data });
 }
 
+// ──────────────────────────────────────────────
+// Navigation buttons
+// ──────────────────────────────────────────────
+function setupNavButtons() {
+    $.navBack.addEventListener('click',    () => emit('touch', { action: 'back' }));
+    $.navHome.addEventListener('click',    () => emit('touch', { action: 'home' }));
+    $.navRecents.addEventListener('click', () => emit('touch', { action: 'recents' }));
+}
+
+// ──────────────────────────────────────────────
 // Map
+// ──────────────────────────────────────────────
 function initMap() {
-    if (state.map) return;
-    
-    state.map = L.map('map').setView([0, 0], 2);
+    if (state.map) { state.map.invalidateSize(); return; }
+
+    state.map = L.map('map').setView([25, 45], 4);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19,
     }).addTo(state.map);
 
-    state.locationMarker = L.circleMarker([0, 0], {
-        radius: 8,
-        fillColor: "#4f8cff",
-        color: "#fff",
+    state.mapMarker = L.circleMarker([0, 0], {
+        radius: 9,
+        fillColor: '#4f8cff',
+        color: '#fff',
         weight: 2,
-        opacity: 1,
-        fillOpacity: 0.8
+        fillOpacity: 0.9,
     }).addTo(state.map);
 
-    state.locationTrail = L.polyline([], { color: '#4f8cff', weight: 3 }).addTo(state.map);
+    state.mapTrail = L.polyline([], { color: '#4f8cff', weight: 2, opacity: 0.7 }).addTo(state.map);
 }
 
-function updateLocation(data) {
-    if (!state.map) return;
-    const { lat, lng, accuracy, speed, timestamp } = data;
-    const latlng = [lat, lng];
-    
-    state.locationMarker.setLatLng(latlng);
-    state.trailLatLngs.push(latlng);
-    state.locationTrail.setLatLngs(state.trailLatLngs);
-    state.map.setView(latlng, 16);
+function updateMap(loc) {
+    const { lat, lng, accuracy, speed, timestamp } = loc;
+    if (!lat || !lng) return;
 
-    document.getElementById('info-latlng').innerText = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    document.getElementById('info-accuracy').innerText = accuracy ? Math.round(accuracy) : 'N/A';
-    document.getElementById('info-speed').innerText = speed ? speed.toFixed(1) : 'N/A';
-    document.getElementById('info-last-update').innerText = new Date(timestamp).toLocaleTimeString();
+    initMap();
+    const ll = [lat, lng];
+    state.mapMarker.setLatLng(ll);
+    state.map.setView(ll, 16);
+
+    state.trailPoints.push(ll);
+    state.mapTrail.setLatLngs(state.trailPoints);
+
+    $.infoLatlng.textContent     = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    $.infoAccuracy.textContent   = accuracy ? `${Math.round(accuracy)} m` : 'N/A';
+    $.infoSpeed.textContent      = speed    ? `${speed.toFixed(1)} m/s`   : 'N/A';
+    $.infoLastUpdate.textContent = timestamp ? new Date(timestamp).toLocaleTimeString() : 'N/A';
 }
 
-document.getElementById('btn-request-location').addEventListener('click', async () => {
-    if (!state.selectedDeviceId) return;
-    await fetch(`${API_BASE}/command/${state.selectedDeviceId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.authToken}` },
-        body: JSON.stringify({ action: 'request_location' })
-    });
-});
-
+// ──────────────────────────────────────────────
 // App Blocker
-document.getElementById('btn-refresh-apps').addEventListener('click', async () => {
-    if (!state.selectedDeviceId) return;
-    await fetch(`${API_BASE}/command/${state.selectedDeviceId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.authToken}` },
-        body: JSON.stringify({ action: 'get_apps' })
-    });
-});
-
+// ──────────────────────────────────────────────
 function renderInstalledApps() {
-    const list = document.getElementById('installed-apps-list');
-    list.innerHTML = '';
-    const filter = document.getElementById('app-search').value.toLowerCase();
-    
-    state.installedApps.forEach(app => {
-        if (filter && !app.name.toLowerCase().includes(filter) && !app.packageName.toLowerCase().includes(filter)) return;
-        
-        const isBlocked = state.blockedApps.includes(app.packageName);
+    $.installedList.innerHTML = '';
+    const q = $.appSearch.value.toLowerCase();
+
+    const apps = state.installedApps.filter(a =>
+        !q || a.appName?.toLowerCase().includes(q) || a.packageName?.toLowerCase().includes(q)
+    );
+
+    if (apps.length === 0) {
+        $.installedList.innerHTML = `<li style="color:var(--text-muted);padding:0.5rem;font-size:0.82rem;">
+            ${state.installedApps.length === 0 ? 'No apps — click Refresh' : 'No results'}
+        </li>`;
+        return;
+    }
+
+    apps.forEach(app => {
+        const blocked = state.blockedApps.includes(app.packageName);
         const li = document.createElement('li');
         li.innerHTML = `
             <div class="app-info">
-                <span>${app.name}</span>
-                <span class="app-pkg">${app.packageName}</span>
+                <span>${escHtml(app.appName || app.packageName)}</span>
+                <span class="app-pkg">${escHtml(app.packageName)}</span>
             </div>
             <label class="switch">
-                <input type="checkbox" ${isBlocked ? 'checked' : ''} onchange="toggleAppBlock('${app.packageName}', this.checked)">
+                <input type="checkbox" data-pkg="${escHtml(app.packageName)}" ${blocked ? 'checked' : ''}>
                 <span class="slider"></span>
-            </label>
-        `;
-        list.appendChild(li);
+            </label>`;
+        li.querySelector('input').addEventListener('change', function () {
+            toggleAppBlock(this.dataset.pkg, this.checked);
+        });
+        $.installedList.appendChild(li);
     });
 }
 
-document.getElementById('app-search').addEventListener('input', renderInstalledApps);
-
-window.toggleAppBlock = async function(pkg, block) {
-    if (!state.selectedDeviceId) return;
-    
-    if (block && !state.blockedApps.includes(pkg)) state.blockedApps.push(pkg);
-    if (!block) state.blockedApps = state.blockedApps.filter(p => p !== pkg);
-    
-    await fetch(`${API_BASE}/blocklist/${state.selectedDeviceId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.authToken}` },
-        body: JSON.stringify({ apps: state.blockedApps, sites: state.blockedSites })
-    });
-    
-    renderBlockedApps();
-};
-
 function renderBlockedApps() {
-    const list = document.getElementById('blocked-apps-list');
-    list.innerHTML = '';
+    $.blockedAppsList.innerHTML = '';
+    if (state.blockedApps.length === 0) {
+        $.blockedAppsList.innerHTML = `<li style="color:var(--text-muted);font-size:0.82rem;padding:0.5rem;">None</li>`;
+        return;
+    }
     state.blockedApps.forEach(pkg => {
         const li = document.createElement('li');
-        li.innerHTML = `<span>${pkg}</span><button onclick="toggleAppBlock('${pkg}', false)">Unblock</button>`;
-        list.appendChild(li);
+        li.innerHTML = `<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;">${escHtml(pkg)}</span>
+            <button class="remove-btn" data-pkg="${escHtml(pkg)}">Unblock</button>`;
+        li.querySelector('.remove-btn').addEventListener('click', function () {
+            toggleAppBlock(this.dataset.pkg, false);
+        });
+        $.blockedAppsList.appendChild(li);
     });
-    if (state.installedApps.length > 0) renderInstalledApps();
 }
 
 function renderAppBlockLog() {
-    const list = document.getElementById('app-block-log');
-    list.innerHTML = '';
-    state.blockLog.apps.forEach(log => {
+    $.appBlockLog.innerHTML = '';
+    state.blockLogApps.slice(0, 30).forEach(log => {
         const li = document.createElement('li');
-        li.innerHTML = `<span>${log.packageName} blocked</span><span class="app-pkg">${new Date(log.timestamp).toLocaleTimeString()}</span>`;
-        list.appendChild(li);
+        li.innerHTML = `<span>${escHtml(log.target || log.packageName)}</span>
+            <span>${new Date(log.timestamp).toLocaleTimeString()}</span>`;
+        $.appBlockLog.appendChild(li);
     });
 }
 
+async function toggleAppBlock(pkg, block) {
+    if (block) { if (!state.blockedApps.includes(pkg)) state.blockedApps.push(pkg); }
+    else        { state.blockedApps = state.blockedApps.filter(p => p !== pkg); }
+    await saveBlocklists();
+    renderBlockedApps();
+    renderInstalledApps();
+}
+
+// ──────────────────────────────────────────────
 // Site Blocker
-function setupBlockers() {
-    document.getElementById('btn-add-domain').addEventListener('click', () => {
-        const input = document.getElementById('domain-input');
-        const domain = input.value.trim().toLowerCase();
-        if (domain && !state.blockedSites.includes(domain)) {
-            state.blockedSites.push(domain);
-            updateSiteBlocklist();
-            input.value = '';
-        }
-    });
-
-    document.querySelectorAll('.preset-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const preset = btn.dataset.preset;
-            let domains = [];
-            if (preset === 'social') domains = ['facebook.com', 'instagram.com', 'tiktok.com', 'twitter.com', 'snapchat.com'];
-            if (preset === 'adult') domains = ['pornhub.com', 'xvideos.com'];
-            if (preset === 'gaming') domains = ['roblox.com', 'steampowered.com'];
-            
-            domains.forEach(d => { if (!state.blockedSites.includes(d)) state.blockedSites.push(d); });
-            updateSiteBlocklist();
-        });
-    });
-}
-
-window.removeDomain = function(domain) {
-    state.blockedSites = state.blockedSites.filter(d => d !== domain);
-    updateSiteBlocklist();
-};
-
-async function updateSiteBlocklist() {
-    if (!state.selectedDeviceId) return;
-    await fetch(`${API_BASE}/blocklist/${state.selectedDeviceId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.authToken}` },
-        body: JSON.stringify({ apps: state.blockedApps, sites: state.blockedSites })
-    });
-    renderBlockedSites();
-}
-
+// ──────────────────────────────────────────────
 function renderBlockedSites() {
-    const list = document.getElementById('blocked-sites-list');
-    list.innerHTML = '';
+    $.blockedSitesList.innerHTML = '';
+    if (state.blockedSites.length === 0) {
+        $.blockedSitesList.innerHTML = `<li style="color:var(--text-muted);font-size:0.82rem;padding:0.5rem;">None</li>`;
+        return;
+    }
     state.blockedSites.forEach(domain => {
         const li = document.createElement('li');
-        li.innerHTML = `<span>${domain}</span><button onclick="removeDomain('${domain}')">Remove</button>`;
-        list.appendChild(li);
+        li.innerHTML = `<span>${escHtml(domain)}</span>
+            <button class="remove-btn" data-d="${escHtml(domain)}">Remove</button>`;
+        li.querySelector('.remove-btn').addEventListener('click', function () {
+            removeDomain(this.dataset.d);
+        });
+        $.blockedSitesList.appendChild(li);
     });
 }
 
 function renderSiteBlockLog() {
-    const list = document.getElementById('site-block-log');
-    list.innerHTML = '';
-    state.blockLog.sites.forEach(log => {
+    $.siteBlockLog.innerHTML = '';
+    state.blockLogSites.slice(0, 30).forEach(log => {
         const li = document.createElement('li');
-        li.innerHTML = `<span>${log.url} blocked</span><span class="app-pkg">${new Date(log.timestamp).toLocaleTimeString()}</span>`;
-        list.appendChild(li);
+        li.innerHTML = `<span>${escHtml(log.target || log.url)}</span>
+            <span>${new Date(log.timestamp).toLocaleTimeString()}</span>`;
+        $.siteBlockLog.appendChild(li);
     });
 }
 
-// Actions
-function setupActions() {
-    const actions = {
-        'action-play-sound': 'play_sound',
-        'action-request-location': 'request_location',
-        'action-lock-screen': 'lock_screen'
-    };
-
-    for (const [id, action] of Object.entries(actions)) {
-        document.getElementById(id).addEventListener('click', async () => {
-            if (!state.selectedDeviceId) return alert('Select a device first');
-            await fetch(`${API_BASE}/command/${state.selectedDeviceId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.authToken}` },
-                body: JSON.stringify({ action })
-            });
-        });
-    }
+async function addDomain(domain) {
+    const d = domain.toLowerCase().trim().replace(/^https?:\/\//,'').split('/')[0];
+    if (!d || state.blockedSites.includes(d)) return;
+    state.blockedSites.push(d);
+    await saveBlocklists();
+    renderBlockedSites();
 }
 
-// Run
-init();
+async function removeDomain(domain) {
+    state.blockedSites = state.blockedSites.filter(d => d !== domain);
+    await saveBlocklists();
+    renderBlockedSites();
+}
+
+function setupBlockerUI() {
+    $.appSearch.addEventListener('input', renderInstalledApps);
+
+    $.btnRefreshApps.addEventListener('click', () => {
+        if (!state.deviceId) return alert('Select a device first.');
+        state.socket.emit('request_installed_apps', state.deviceId);
+    });
+
+    $.btnAddDomain.addEventListener('click', () => {
+        const v = $.domainInput.value.trim();
+        if (v) { addDomain(v); $.domainInput.value = ''; }
+    });
+
+    $.domainInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { const v = $.domainInput.value.trim(); if (v) { addDomain(v); $.domainInput.value = ''; } }
+    });
+
+    const PRESETS = {
+        social: ['facebook.com','instagram.com','tiktok.com','twitter.com','x.com','snapchat.com','reddit.com'],
+        adult:  ['pornhub.com','xvideos.com','xnxx.com','xhamster.com','onlyfans.com'],
+        gaming: ['roblox.com','steampowered.com','store.steampowered.com','epicgames.com'],
+    };
+
+    $.presetBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const domains = PRESETS[btn.dataset.preset] || [];
+            domains.forEach(d => addDomain(d));
+        });
+    });
+}
+
+// ──────────────────────────────────────────────
+// Actions
+// ──────────────────────────────────────────────
+function setupActions() {
+    $.btnPlaySound.addEventListener('click',   () => sendCommand('play_sound'));
+    $.btnReqLoc2.addEventListener('click',     () => sendCommand('request_location'));
+    $.btnLockScreen.addEventListener('click',  () => sendCommand('lock_screen'));
+    $.btnReqLocation.addEventListener('click', () => sendCommand('request_location'));
+}
+
+// ──────────────────────────────────────────────
+// Quality selector
+// ──────────────────────────────────────────────
+function setupQualityBtns() {
+    $.qualityBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            $.qualityBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            // Emit quality change to device
+            if (state.deviceId) emit('touch', { action: 'set_quality', quality: btn.dataset.q });
+        });
+    });
+}
+
+// ──────────────────────────────────────────────
+// Utility
+// ──────────────────────────────────────────────
+function escHtml(str) {
+    return String(str ?? '')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}

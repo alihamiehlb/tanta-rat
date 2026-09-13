@@ -5,161 +5,313 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GuardianShield Dashboard</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 </head>
 <body>
 
-    <!-- Login Screen -->
-    <div id="login-screen">
-        <div class="login-card">
-            <h1>🛡️ GuardianShield</h1>
-            <p>Parental Control Dashboard</p>
-            <form id="login-form">
-                <input type="text" id="auth-token" placeholder="Enter Auth Token" autocomplete="off">
-                <button type="submit">Connect</button>
-            </form>
-            <p class="login-hint">Enter the AUTH_TOKEN you set in Railway</p>
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+    <div class="login-card">
+        <div class="login-logo">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4f8cff" stroke-width="1.5">
+                <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"/>
+                <path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
         </div>
-    </div>
-
-    <!-- Main Dashboard -->
-    <div id="main-dashboard" class="hidden">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <h2>Connected Devices</h2>
+        <h1>GuardianShield</h1>
+        <p>Parental Control Dashboard</p>
+        <form id="login-form">
+            <div class="input-group">
+                <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                <input type="password" id="auth-token" placeholder="Enter Auth Token" autocomplete="off">
             </div>
-            <ul id="device-list">
-                <li class="no-devices">No devices connected</li>
-                <!-- Device items injected here -->
-            </ul>
-        </aside>
+            <button type="submit" id="btn-connect">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+                Connect
+            </button>
+        </form>
+        <p class="login-hint">Enter the AUTH_TOKEN set in your Railway environment</p>
+    </div>
+</div>
 
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Tabs Navigation -->
+<!-- MAIN DASHBOARD -->
+<div id="main-dashboard" class="hidden">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4f8cff" stroke-width="1.5">
+                <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"/>
+            </svg>
+            <span>GuardianShield</span>
+        </div>
+        <div class="sidebar-section-label">Connected Devices</div>
+        <ul id="device-list">
+            <li class="no-devices">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20">
+                    <rect x="5" y="2" width="14" height="20" rx="2"/>
+                    <line x1="12" y1="18" x2="12" y2="18.01"/>
+                </svg>
+                No devices connected
+            </li>
+        </ul>
+        <div class="sidebar-footer">
+            <button id="btn-logout" class="logout-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                Disconnect
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+        <!-- Top bar -->
+        <div class="topbar">
             <nav class="tabs-nav">
-                <button class="tab-btn active" data-tab="mirror">Screen Mirror</button>
-                <button class="tab-btn" data-tab="location">Location</button>
-                <button class="tab-btn" data-tab="app-blocker">App Blocker</button>
-                <button class="tab-btn" data-tab="site-blocker">Site Blocker</button>
-                <button class="tab-btn" data-tab="actions">Actions</button>
+                <button class="tab-btn active" data-tab="mirror">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16">
+                        <rect x="5" y="2" width="14" height="20" rx="2"/>
+                        <line x1="12" y1="18" x2="12" y2="18.01"/>
+                    </svg>
+                    Screen
+                </button>
+                <button class="tab-btn" data-tab="location">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                        <circle cx="12" cy="10" r="3"/>
+                    </svg>
+                    Location
+                </button>
+                <button class="tab-btn" data-tab="app-blocker">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                    </svg>
+                    App Blocker
+                </button>
+                <button class="tab-btn" data-tab="site-blocker">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="2" y1="12" x2="22" y2="12"/>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                    </svg>
+                    Site Blocker
+                </button>
+                <button class="tab-btn" data-tab="actions">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                    </svg>
+                    Actions
+                </button>
             </nav>
+            <div class="topbar-right">
+                <span id="connection-status" class="status-badge offline">
+                    <span class="status-dot"></span>
+                    No Device
+                </span>
+                <span id="fps-counter" class="stat-badge">0 FPS</span>
+                <span id="latency-indicator" class="stat-badge">-- ms</span>
+            </div>
+        </div>
 
-            <!-- Tab Contents -->
-            <div class="tab-content active" id="tab-mirror">
-                <div class="mirror-container">
-                    <div class="mirror-header">
-                        <span id="mirror-status">Select a device</span>
-                        <div class="mirror-controls">
-                            <select id="quality-selector">
-                                <option value="low">Low (480p)</option>
-                                <option value="medium" selected>Medium (720p)</option>
-                                <option value="high">High (1080p)</option>
-                            </select>
-                            <span id="fps-counter">0 FPS</span>
-                            <span id="latency-indicator">0ms</span>
-                        </div>
-                    </div>
+        <!-- Tab: Screen Mirror -->
+        <div class="tab-content active" id="tab-mirror">
+            <div class="mirror-layout">
+                <div class="canvas-panel">
                     <div class="canvas-wrapper">
                         <canvas id="screen-canvas" tabindex="0"></canvas>
+                        <div class="canvas-placeholder" id="canvas-placeholder">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1" width="64" height="64">
+                                <rect x="5" y="2" width="14" height="20" rx="2"/>
+                                <line x1="12" y1="18" x2="12" y2="18.01" stroke-width="2"/>
+                            </svg>
+                            <p>Select a device to start streaming</p>
+                        </div>
                     </div>
                     <div class="nav-buttons">
-                        <button id="nav-back">⬅️ Back</button>
-                        <button id="nav-home">🏠 Home</button>
-                        <button id="nav-recents">⬜ Recents</button>
+                        <button class="nav-btn" id="nav-back" title="Back">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                <polyline points="15 18 9 12 15 6"/>
+                            </svg>
+                            Back
+                        </button>
+                        <button class="nav-btn" id="nav-home" title="Home">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                                <polyline points="9 22 9 12 15 12 15 22"/>
+                            </svg>
+                            Home
+                        </button>
+                        <button class="nav-btn" id="nav-recents" title="Recents">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                <rect x="2" y="3" width="20" height="14" rx="2"/>
+                                <line x1="8" y1="21" x2="16" y2="21"/>
+                                <line x1="12" y1="17" x2="12" y2="21"/>
+                            </svg>
+                            Recents
+                        </button>
                     </div>
                 </div>
-            </div>
-
-            <div class="tab-content" id="tab-location">
-                <div class="location-header">
-                    <button id="btn-request-location" class="action-btn">Request Location Now</button>
-                </div>
-                <div class="map-wrapper">
-                    <div id="map"></div>
-                    <div class="map-info-panel">
-                        <p><strong>Lat/Lng:</strong> <span id="info-latlng">N/A</span></p>
-                        <p><strong>Accuracy:</strong> <span id="info-accuracy">N/A</span> m</p>
-                        <p><strong>Speed:</strong> <span id="info-speed">N/A</span> m/s</p>
-                        <p><strong>Last Update:</strong> <span id="info-last-update">N/A</span></p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="tab-content" id="tab-app-blocker">
-                <div class="app-blocker-grid">
-                    <div class="card">
-                        <h3>Installed Apps</h3>
-                        <div class="card-controls">
-                            <input type="text" id="app-search" placeholder="Search apps...">
-                            <button id="btn-refresh-apps">Refresh Apps</button>
+                <div class="mirror-controls-panel">
+                    <div class="control-card">
+                        <h3>Stream Quality</h3>
+                        <div class="quality-btns">
+                            <button class="quality-btn" data-q="low">Low</button>
+                            <button class="quality-btn active" data-q="medium">Medium</button>
+                            <button class="quality-btn" data-q="high">High</button>
                         </div>
-                        <ul id="installed-apps-list" class="app-list">
-                            <!-- Populated dynamically -->
+                    </div>
+                    <div class="control-card">
+                        <h3>How to Control</h3>
+                        <ul class="help-list">
+                            <li>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><circle cx="12" cy="12" r="10"/></svg>
+                                Click to tap
+                            </li>
+                            <li>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+                                Drag to swipe
+                            </li>
+                            <li>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+                                Type while focused
+                            </li>
                         </ul>
                     </div>
-                    <div class="side-panels">
-                        <div class="card">
-                            <h3>Blocked Apps</h3>
-                            <ul id="blocked-apps-list" class="app-list"></ul>
-                        </div>
-                        <div class="card">
-                            <h3>Block Log</h3>
-                            <ul id="app-block-log" class="log-list"></ul>
-                        </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Location -->
+        <div class="tab-content" id="tab-location">
+            <div class="location-layout">
+                <div class="map-wrapper">
+                    <div id="map"></div>
+                </div>
+                <div class="location-sidebar">
+                    <div class="control-card">
+                        <h3>Location Info</h3>
+                        <div class="info-row"><span>Latitude/Longitude</span><strong id="info-latlng">N/A</strong></div>
+                        <div class="info-row"><span>Accuracy</span><strong id="info-accuracy">N/A</strong></div>
+                        <div class="info-row"><span>Speed</span><strong id="info-speed">N/A</strong></div>
+                        <div class="info-row"><span>Last Update</span><strong id="info-last-update">N/A</strong></div>
+                    </div>
+                    <button class="action-btn full" id="btn-request-location">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+                        </svg>
+                        Request Location Now
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: App Blocker -->
+        <div class="tab-content" id="tab-app-blocker">
+            <div class="blocker-layout">
+                <div class="control-card flex-col" style="flex:2">
+                    <div class="card-header">
+                        <h3>Installed Apps</h3>
+                        <button class="action-btn small" id="btn-refresh-apps">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <polyline points="23 4 23 10 17 10"/>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                            </svg>
+                            Refresh
+                        </button>
+                    </div>
+                    <input type="text" id="app-search" placeholder="Search apps..." class="search-input">
+                    <ul id="installed-apps-list" class="item-list"></ul>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:1rem;flex:1">
+                    <div class="control-card flex-col">
+                        <h3>Blocked Apps</h3>
+                        <ul id="blocked-apps-list" class="item-list"></ul>
+                    </div>
+                    <div class="control-card flex-col">
+                        <h3>Block Log</h3>
+                        <ul id="app-block-log" class="log-list"></ul>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="tab-content" id="tab-site-blocker">
-                <div class="site-blocker-grid">
-                    <div class="card">
-                        <h3>Block Domain</h3>
-                        <div class="add-domain-form">
-                            <input type="text" id="domain-input" placeholder="e.g. reddit.com">
-                            <button id="btn-add-domain">Add</button>
-                        </div>
-                        <h4>Quick Add Presets</h4>
+        <!-- Tab: Site Blocker -->
+        <div class="tab-content" id="tab-site-blocker">
+            <div class="blocker-layout">
+                <div class="control-card flex-col" style="flex:2">
+                    <h3>Block Domain</h3>
+                    <div class="add-row">
+                        <input type="text" id="domain-input" placeholder="e.g. tiktok.com" class="search-input">
+                        <button class="action-btn" id="btn-add-domain">Add</button>
+                    </div>
+                    <div class="presets-section">
+                        <p class="section-label">Quick Presets</p>
                         <div class="presets-buttons">
                             <button class="preset-btn" data-preset="social">Social Media</button>
                             <button class="preset-btn" data-preset="adult">Adult Content</button>
                             <button class="preset-btn" data-preset="gaming">Gaming</button>
                         </div>
-                        <h4>Blocked Domains</h4>
-                        <ul id="blocked-sites-list" class="site-list"></ul>
                     </div>
-                    <div class="card">
-                        <h3>Block Log</h3>
-                        <ul id="site-block-log" class="log-list"></ul>
-                    </div>
+                    <p class="section-label">Blocked Domains</p>
+                    <ul id="blocked-sites-list" class="item-list"></ul>
+                </div>
+                <div class="control-card flex-col" style="flex:1">
+                    <h3>Block Log</h3>
+                    <ul id="site-block-log" class="log-list"></ul>
                 </div>
             </div>
+        </div>
 
-            <div class="tab-content" id="tab-actions">
-                <div class="actions-grid">
-                    <button class="big-action-btn" id="action-play-sound">
-                        <span class="icon">🔊</span>
-                        <span>Play Alarm Sound</span>
-                    </button>
-                    <button class="big-action-btn" id="action-request-location">
-                        <span class="icon">📍</span>
-                        <span>Request Location</span>
-                    </button>
-                    <button class="big-action-btn" id="action-lock-screen">
-                        <span class="icon">🔒</span>
-                        <span>Lock Screen</span>
-                    </button>
-                </div>
+        <!-- Tab: Actions -->
+        <div class="tab-content" id="tab-actions">
+            <div class="actions-layout">
+                <button class="big-action-btn" id="action-play-sound">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                    </svg>
+                    <span class="action-label">Play Alarm</span>
+                    <span class="action-desc">Max volume, 30 seconds</span>
+                </button>
+                <button class="big-action-btn" id="action-request-location">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                        <circle cx="12" cy="10" r="3"/>
+                    </svg>
+                    <span class="action-label">Get Location</span>
+                    <span class="action-desc">Request immediate update</span>
+                </button>
+                <button class="big-action-btn" id="action-lock-screen">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                    <span class="action-label">Lock Screen</span>
+                    <span class="action-desc">Lock device immediately</span>
+                </button>
             </div>
+        </div>
 
-        </main>
-    </div>
+    </main>
+</div>
 
-    <!-- Scripts -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js"></script>
+<!-- Scripts -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

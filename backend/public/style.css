@@ -40,9 +40,8 @@ body {
 
 /* Utilities */
 .hidden { display: none !important; }
-.active { display: block; } /* Can be overridden for flex */
 
-/* Login Screen */
+/* Login Screen - visible by default */
 #login-screen {
     display: flex;
     justify-content: center;
@@ -50,8 +49,12 @@ body {
     height: 100vh;
     background-color: var(--bg-page);
 }
-#login-screen.active {
+
+/* Main dashboard - hidden by default, shown when .hidden is removed */
+#main-dashboard {
     display: flex;
+    height: 100vh;
+    overflow: hidden;
 }
 
 .login-card {
@@ -87,13 +90,11 @@ body {
 }
 .login-card button:hover { background-color: #3b76e5; }
 
-/* Main Dashboard */
-#main-dashboard {
-    height: 100vh;
-    display: flex;
-}
-#main-dashboard.active {
-    display: flex;
+.login-hint {
+    margin-top: 1rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0 !important;
 }
 
 /* Sidebar */

@@ -11,14 +11,15 @@
 <body>
 
     <!-- Login Screen -->
-    <div id="login-screen" class="active">
+    <div id="login-screen">
         <div class="login-card">
-            <h1>GuardianShield</h1>
+            <h1>🛡️ GuardianShield</h1>
             <p>Parental Control Dashboard</p>
             <form id="login-form">
-                <input type="text" id="auth-token" placeholder="Enter Auth Token" required>
+                <input type="text" id="auth-token" placeholder="Enter Auth Token" autocomplete="off">
                 <button type="submit">Connect</button>
             </form>
+            <p class="login-hint">Enter the AUTH_TOKEN you set in Railway</p>
         </div>
     </div>
 

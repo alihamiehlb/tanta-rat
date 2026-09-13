@@ -89,15 +89,19 @@ function connectSocket(token) {
     });
 
     state.socket.on('connect', () => {
-        els.loginScreen.classList.remove('active');
-        els.mainDashboard.classList.add('active');
+        console.log('Connected to server');
+        els.loginScreen.classList.add('hidden');
+        els.mainDashboard.classList.remove('hidden');
     });
 
     state.socket.on('connect_error', (err) => {
-        alert('Connection error. Please check your token.');
+        console.error('Connection error:', err.message);
         localStorage.removeItem('guardianToken');
-        els.loginScreen.classList.add('active');
-        els.mainDashboard.classList.remove('active');
+        state.authToken = '';
+        els.loginScreen.classList.remove('hidden');
+        els.mainDashboard.classList.add('hidden');
+        if (state.socket) { state.socket.disconnect(); state.socket = null; }
+        alert('Connection error: Invalid token or server unreachable.');
     });
 
     state.socket.on('devices_list', (devices) => {

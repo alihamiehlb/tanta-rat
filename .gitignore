@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment & secrets
+.env
+.env.example
+.env.local
+.env.production
+
+# Data store files (generated at runtime)
+data/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Android build outputs
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
+android/.externalNativeBuild/
+
+# APK files
+*.apk
+*.aab
+
+# Logs
+*.log

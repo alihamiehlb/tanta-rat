@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GuardianShield Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+</head>
+<body>
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="active">
+        <div class="login-card">
+            <h1>GuardianShield</h1>
+            <p>Parental Control Dashboard</p>
+            <form id="login-form">
+                <input type="text" id="auth-token" placeholder="Enter Auth Token" required>
+                <button type="submit">Connect</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="main-dashboard" class="hidden">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Connected Devices</h2>
+            </div>
+            <ul id="device-list">
+                <li class="no-devices">No devices connected</li>
+                <!-- Device items injected here -->
+            </ul>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Tabs Navigation -->
+            <nav class="tabs-nav">
+                <button class="tab-btn active" data-tab="mirror">Screen Mirror</button>
+                <button class="tab-btn" data-tab="location">Location</button>
+                <button class="tab-btn" data-tab="app-blocker">App Blocker</button>
+                <button class="tab-btn" data-tab="site-blocker">Site Blocker</button>
+                <button class="tab-btn" data-tab="actions">Actions</button>
+            </nav>
+
+            <!-- Tab Contents -->
+            <div class="tab-content active" id="tab-mirror">
+                <div class="mirror-container">
+                    <div class="mirror-header">
+                        <span id="mirror-status">Select a device</span>
+                        <div class="mirror-controls">
+                            <select id="quality-selector">
+                                <option value="low">Low (480p)</option>
+                                <option value="medium" selected>Medium (720p)</option>
+                                <option value="high">High (1080p)</option>
+                            </select>
+                            <span id="fps-counter">0 FPS</span>
+                            <span id="latency-indicator">0ms</span>
+                        </div>
+                    </div>
+                    <div class="canvas-wrapper">
+                        <canvas id="screen-canvas" tabindex="0"></canvas>
+                    </div>
+                    <div class="nav-buttons">
+                        <button id="nav-back">⬅️ Back</button>
+                        <button id="nav-home">🏠 Home</button>
+                        <button id="nav-recents">⬜ Recents</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="tab-location">
+                <div class="location-header">
+                    <button id="btn-request-location" class="action-btn">Request Location Now</button>
+                </div>
+                <div class="map-wrapper">
+                    <div id="map"></div>
+                    <div class="map-info-panel">
+                        <p><strong>Lat/Lng:</strong> <span id="info-latlng">N/A</span></p>
+                        <p><strong>Accuracy:</strong> <span id="info-accuracy">N/A</span> m</p>
+                        <p><strong>Speed:</strong> <span id="info-speed">N/A</span> m/s</p>
+                        <p><strong>Last Update:</strong> <span id="info-last-update">N/A</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="tab-app-blocker">
+                <div class="app-blocker-grid">
+                    <div class="card">
+                        <h3>Installed Apps</h3>
+                        <div class="card-controls">
+                            <input type="text" id="app-search" placeholder="Search apps...">
+                            <button id="btn-refresh-apps">Refresh Apps</button>
+                        </div>
+                        <ul id="installed-apps-list" class="app-list">
+                            <!-- Populated dynamically -->
+                        </ul>
+                    </div>
+                    <div class="side-panels">
+                        <div class="card">
+                            <h3>Blocked Apps</h3>
+                            <ul id="blocked-apps-list" class="app-list"></ul>
+                        </div>
+                        <div class="card">
+                            <h3>Block Log</h3>
+                            <ul id="app-block-log" class="log-list"></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="tab-site-blocker">
+                <div class="site-blocker-grid">
+                    <div class="card">
+                        <h3>Block Domain</h3>
+                        <div class="add-domain-form">
+                            <input type="text" id="domain-input" placeholder="e.g. reddit.com">
+                            <button id="btn-add-domain">Add</button>
+                        </div>
+                        <h4>Quick Add Presets</h4>
+                        <div class="presets-buttons">
+                            <button class="preset-btn" data-preset="social">Social Media</button>
+                            <button class="preset-btn" data-preset="adult">Adult Content</button>
+                            <button class="preset-btn" data-preset="gaming">Gaming</button>
+                        </div>
+                        <h4>Blocked Domains</h4>
+                        <ul id="blocked-sites-list" class="site-list"></ul>
+                    </div>
+                    <div class="card">
+                        <h3>Block Log</h3>
+                        <ul id="site-block-log" class="log-list"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="tab-actions">
+                <div class="actions-grid">
+                    <button class="big-action-btn" id="action-play-sound">
+                        <span class="icon">🔊</span>
+                        <span>Play Alarm Sound</span>
+                    </button>
+                    <button class="big-action-btn" id="action-request-location">
+                        <span class="icon">📍</span>
+                        <span>Request Location</span>
+                    </button>
+                    <button class="big-action-btn" id="action-lock-screen">
+                        <span class="icon">🔒</span>
+                        <span>Lock Screen</span>
+                    </button>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<device-admin>
+    <uses-policies>
+        <!-- Allows remote lock -->
+        <force-lock />
+        <!-- Allows remote wipe (emergency only) -->
+        <wipe-data />
+    </uses-policies>
+</device-admin>

@@ -115,12 +115,14 @@ class MainService : Service() {
      */
     private fun initializeSocket() {
         try {
+            val encToken = java.net.URLEncoder.encode(Config.AUTH_TOKEN, "UTF-8")
+            val encDevId = java.net.URLEncoder.encode(Config.deviceId, "UTF-8")
+            val encModel = java.net.URLEncoder.encode(Build.MODEL ?: "Unknown", "UTF-8")
+            val encLabel = java.net.URLEncoder.encode(Config.deviceLabel ?: "Device", "UTF-8")
+            val encOs    = java.net.URLEncoder.encode(Build.VERSION.RELEASE ?: "Android", "UTF-8")
+
             val options = IO.Options().apply {
-                query = "auth=${Config.AUTH_TOKEN}" +
-                    "&deviceId=${Config.deviceId}" +
-                    "&model=${Build.MODEL}" +
-                    "&label=${Config.deviceLabel}" +
-                    "&osVersion=${Build.VERSION.RELEASE}"
+                query = "token=$encToken&deviceId=$encDevId&model=$encModel&label=$encLabel&osVersion=$encOs"
                 transports = arrayOf("websocket")
                 reconnection = true
                 reconnectionDelay = 1000

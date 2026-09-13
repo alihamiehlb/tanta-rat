@@ -41,6 +41,7 @@ function initDom() {
         loginForm:      document.getElementById('login-form'),
         tokenInput:     document.getElementById('auth-token'),
         btnLogout:      document.getElementById('btn-logout'),
+        btnRefreshDevices: document.getElementById('btn-refresh-devices'),
         deviceList:     document.getElementById('device-list'),
         tabBtns:        document.querySelectorAll('.tab-btn'),
         tabContents:    document.querySelectorAll('.tab-content'),
@@ -108,6 +109,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     $.btnLogout.addEventListener('click', disconnect);
+    $.btnRefreshDevices.addEventListener('click', async () => {
+        try {
+            const list = await apiFetch('/devices');
+            state.devices.clear();
+            list.forEach(d => state.devices.set(d.deviceId, d));
+            renderDeviceList();
+        } catch (e) {
+            console.warn('Manual device refresh failed', e);
+        }
+    });
 
     // FPS counter
     setInterval(() => {

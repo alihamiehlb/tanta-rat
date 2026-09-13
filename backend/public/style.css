@@ -50,9 +50,12 @@ body {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 16px;
-    padding: 2.5rem;
-    width: 360px;
+    padding: 2.5rem 2rem;
+    width: 100%;
+    max-width: 400px;
     text-align: center;
+    box-sizing: border-box;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6);
 }
 
 .login-logo {
@@ -91,6 +94,7 @@ body {
 
 .input-group input {
     width: 100%;
+    box-sizing: border-box;
     padding: 0.75rem 0.75rem 0.75rem 2.5rem;
     background: var(--bg-input);
     border: 1px solid var(--border);
@@ -105,21 +109,24 @@ body {
 
 #btn-connect {
     width: 100%;
-    padding: 0.75rem;
+    height: 48px;
+    padding: 0 1.25rem;
     background: var(--primary);
     color: #fff;
     border: none;
     border-radius: var(--radius);
-    font-size: 0.95rem;
+    font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    transition: background 0.2s;
+    box-sizing: border-box;
+    transition: background 0.2s, transform 0.1s;
 }
 #btn-connect:hover { background: var(--primary-dark); }
+#btn-connect:active { transform: scale(0.98); }
 #btn-connect svg { flex-shrink: 0; }
 
 .login-hint {
@@ -159,13 +166,37 @@ body {
     color: #fff;
 }
 
-.sidebar-section-label {
+.sidebar-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     padding: 0.75rem 1rem 0.4rem;
+}
+
+.sidebar-section-label {
+    padding: 0;
     font-size: 0.7rem;
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--text-muted);
+}
+
+.icon-btn-small {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s, background 0.15s;
+}
+.icon-btn-small:hover {
+    color: var(--primary);
+    background: rgba(255,255,255,0.05);
 }
 
 #device-list {

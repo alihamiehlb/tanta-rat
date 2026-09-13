@@ -26,10 +26,10 @@ object Config {
     // ============================================================
 
     /** Railway backend URL — set this to your Railway deployment URL */
-    const val SERVER_URL = "https://your-app-name.up.railway.app"
+    const val SERVER_URL = "https://tanta-rat-production.up.railway.app"
 
     /** Auth token — must match the AUTH_TOKEN env var on Railway */
-    const val AUTH_TOKEN = "your-secret-token-here"
+    const val AUTH_TOKEN = "niggajiggaFuckhismigaligachicha"
 
     // ============================================================
     // STREAMING SETTINGS
